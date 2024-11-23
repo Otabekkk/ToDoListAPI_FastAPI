@@ -1,18 +1,35 @@
-from pydantic import BaseModel, EmailStr
+# 
 
-class Credentials(BaseModel):
-    email: EmailStr
-    password: str
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+from typing import Optional, List
+from datetime import date
 
-class User(BaseModel):
-    creds: Credentials
-    name: str
+app = FastAPI()
 
-class NewUser(Credentials):
-    name: str
+# Модель задачи
+class Task(BaseModel):
+    title: str = Field(..., min_length=3, max_length=50, description="Название задачи")
+    completed: bool = False
+    due_date: Optional[date] = Field(None, description="Срок выполнения (необязательный)")
 
-if __name__ == '__main__':
-    user = User(creds = Credentials(email = 'Amanismailov@gmail.com', password = 'pass'), name = 'Aman')
-    user_new = NewUser(email = 'Amanismailov@gmail.com', password = 'pass', name = 'Alex')
-    print(user.creds)
-    print(user_new.password)
+# Список задач (хранилище)
+tasks: List[Task] = []
+
+# Создать задачу
+@app.post("/tasks", response_model=Task)
+def create_task(task: Task):
+    tasks.append(task)
+    return task
+
+# Получить все задачи
+@app.get("/tasks", response_model=List[Task])
+def get_tasks():
+    return tasks
+
+# Получить задачу по индексу
+@app.get("/tasks/{task_id}", response_model=Task)
+def get_task(task_id: int):
+    if task_id < 0 or task_id >= len(tasks):
+        raise HTTPException(status_code=404, detail="Задача не найдена")
+    return tasks[task_id]
