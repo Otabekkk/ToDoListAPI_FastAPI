@@ -1,26 +1,16 @@
-import random
 
-def guess_the_number():
-    print("Добро пожаловать в игру 'Угадай число'!")
-    print("Я загадаю число от 1 до 100, а ты постараешься угадать.")
-    
-    number_to_guess = random.randint(1, 100)
-    attempts = 0
-    
-    while True:
-        try:
-            guess = int(input("Введи число: "))
-            attempts += 1
-            
-            if guess < number_to_guess:
-                print("Моё число больше!")
-            elif guess > number_to_guess:
-                print("Моё число меньше!")
-            else:
-                print(f"Поздравляю! Ты угадал число {number_to_guess} за {attempts} попыток.")
-                break
-        except ValueError:
-            print("Пожалуйста, вводи только числа!")
+@router.get('/', response_model = List[TaskResponse])
+def get_tasks(db: Session = Depends(get_db)) -> list[TaskResponse]:
+    # Получаем список задач
+    tasks = db.query(Task).all()
+    return [TaskResponse(**task.__dict__) for task in tasks]
 
-if __name__ == "__main__":
-    guess_the_number()
+
+
+@router.post('/', response_model = TaskCreate)
+def create_task(task: TaskCreate, db: Session = Depends(get_db)) -> dict:
+    new_task = Task(**task.dict())
+    db.add(new_task)
+    db.commit()
+    db.refresh(new_task)
+    return {'task': new_task}
