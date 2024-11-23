@@ -1,29 +1,38 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate
 from typing import List
-
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.models.task import Task
+from app.schemas.task import TaskCreate, TaskUpdate, TaskResponse
 
 router = APIRouter()
 
-# Временно хранилище
-tasks = []
+# # Временно хранилище
+# tasks = []
 
-# Id задач
-idd: int = 1
+# # Id задач
+# idd: int = 1
 
 
 
 # Получение списка задач
-@router.get('/')
-def get_tasks() -> list[dict]:
+@router.get('/', response_model = List[TaskResponse])
+def get_tasks(db: Session = Depends(get_db)) -> list[TaskResponse]:
     # Получаем список задач
-    return tasks
+    tasks = db.query(Task).all()
+    return [TaskResponse(**task.__dict__) for task in tasks]
 
 
 
 # Добавление задачи
-@router.post('/')
-def create_task(title: str, description: str = '') -> dict:
-    global idd
+@router.post('/', response_model = TaskCreate)
+def create_task(task: TaskCreate, db: Session = Depends(get_db)) -> dict:
+    new_task = Task(**task.dict())
+    db.add(new_task)
+    db.commit()
+    db.refresh(new_task)
+    return {'task': new_task}
 
 # def create_task(data: dict) -> dict:
     # Создание новой задачи
@@ -34,57 +43,85 @@ def create_task(title: str, description: str = '') -> dict:
     #     'is_done': False
     # }
 
-    task = {
-        'id': idd,
-        'title': title,
-        'description': description,
-        'is_done': False
-    }
+    # task = {
+    #     'id': idd,
+    #     **task.model_dump()
+    # }
 
-    tasks.append(task)
-    idd += 1
-    return task
+    # tasks.append(task)
+    # idd += 1
+    # return task
 
 
 # Поиск задачи
-@router.get('/{task_id}')
-def get_task_by_id(id: int) -> dict:
-    for task in tasks: # tasks = [{'key': 'value'}, {'key': 'value'}]
-        if task['id'] == id:
-            return task
+@router.get('/{task_id}', response_model = TaskResponse)
+def get_task_by_id(task_id: int, db: Session = Depends(get_db)) -> TaskResponse:
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code = 404, detail = 'Task not found!')
+    return TaskResponse(**task.__dict__)
+    # for task in tasks: # tasks = [{'key': 'value'}, {'key': 'value'}]
+    #     if task['id'] == id:
+    #         return task
         
-    raise HTTPException(status_code = 404, detail = 'Task not found!')
+    # raise HTTPException(status_code = 404, detail = 'Task not found!')
 
 
 # Обноваление задачи
-@router.put('/{task_id}')
-def update_task(id: int, title: str = None, description: str = None, is_done: bool = None) -> dict:
-    for task in tasks:
-        if task['id'] == id:
+@router.put('/{task_id}', response_model = TaskUpdate)
+def update_task(task_id: int, task_update: TaskUpdate, db: Session = Depends(get_db)) -> TaskResponse:
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code = 404, detail = 'Task not found!')
+    
+    update_data = task_update.model_dump(exclude_unset = True)
 
-            if title is not None:
+    for key, value in update_data.items():
+        setattr(task, key, value)
+
+    db.commit()
+    db.refresh()
+
+    return task
+
+
+    # for task in tasks:
+    #     if task['id'] == id:
+    #         update_data = task_update.model_dump(exclude_unset = True)
+
+    #         for key, value in update_data.items():
+    #             task[key] = value
+# ------------------------------------------------------------------------------ #
+            # if title is not None:
                
-                task['title'] = title
-            if description is not None:
+            #     task['title'] = title
+            # if description is not None:
                
-                task['description'] = description
+            #     task['description'] = description
             
-            if is_done is not None:
-                task['is_done'] = is_done
-
-            return task
+            # if is_done is not None:
+            #     task['is_done'] = is_done
+# ------------------------------------------------------------------------------ #
+            # return task
         
-    raise HTTPException(status_code = 404, detail = 'Task not found!')
+    # raise HTTPException(status_code = 404, detail = 'Task not found!')
 
 
 # Удаление задачи
-@router.delete('/{task_id}')
-def delete_task(id: int) -> dict:
-    for task in tasks:
-        if task['id'] == id:
-            tasks.remove(task)
+@router.delete('/{task_id}', response_model = TaskResponse)
+def delete_task(task_id: int, db: Session = Depends(get_db)) -> TaskResponse:
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code = 404, detail = 'Task not found!')
+    db.delete(task)
+    db.commit()
 
-            return {'Status': 'Deleted!'}
+    return task
+    # for task in tasks:
+    #     if task['id'] == id:
+    #         tasks.remove(task)
+
+    #         return {'Status': 'Deleted!'}
     
-    raise HTTPException(status_code = 404, detail = 'Task not found!')
+    # raise HTTPException(status_code = 404, detail = 'Task not found!')
 
