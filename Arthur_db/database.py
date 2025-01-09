@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-DBURL = 'postgresql://postgres:ztw02@localhost:5432/QuizApplication'
+DBURL = 'postgresql://'
 
 engine = create_engine(DBURL)
 
